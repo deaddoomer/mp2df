@@ -929,7 +929,7 @@ program mp2df;
 
   procedure Help;
   begin
-    WriteLn('Usage: mp2df [OPTION] FILE.dvl [OUTPUT]');
+    WriteLn('Usage: mp2df [OPTION] FILE.dlv [OUTPUT]');
     WriteLn('Options:');
     WriteLn('    -l  list textures used on map and exit');
     WriteLn('    -h  show this help');
