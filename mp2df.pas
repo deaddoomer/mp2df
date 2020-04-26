@@ -943,7 +943,7 @@ program mp2df;
     while (i <= ParamCount) and (not done) do
     begin
       str := ParamStr(i);
-      done := str[1] <> '-';
+      done := (Length(str) = 0) or (str[1] <> '-');
       if not done then
       begin
         case str of
