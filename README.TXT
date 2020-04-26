@@ -1,5 +1,6 @@
 mp2df - Doom 2D Multiplayer to Doom 2D Forever map converter.
 Created by SovietPony 25/04/2020, licenced under GPLv3-only.
+You may found latest sources at https://repo.or.cz/mp2df.git
 
 How to use:
 1. copy `data` directory form D2DMP to mp2df.exe location
