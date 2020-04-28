@@ -338,6 +338,10 @@ program mp2df;
     width, height: Integer;
     textures: array of Texture;
     tiles: array of Tile;
+    havePanels: Boolean;
+    haveItems: Boolean;
+    haveAreas: Boolean;
+    haveTriggers: Boolean;
 
   (* --------- Reader --------- *)
 
@@ -447,33 +451,40 @@ program mp2df;
     for i := 0 to High(tiles) do
     begin
       tiles[i].id := -1;
-      if tiles[i].t in [MP_COLLIDE..MP_NOACT] then
-      begin
-        t := tiles[i].s;
-        if (t in [MP_CLOSEDOOR..MP_DOOR]) or (t >= 101) and (t <= 400) or (t >= 501) and (t <= 800) then
-        begin
-          x := tiles[i].x0;
-          y := tiles[i].y0;
-          w := tiles[i].x1 - tiles[i].x0;
-          h := tiles[i].y1 - tiles[i].y0;
-          for j := 0 to High(tiles) do
+      case tiles[i].t of
+        MP_WALL..MP_LIFTRIGHT: havePanels := true;
+        MP_MEDKIT_SMALL..MP_WEAPON_SUPERPULEMET, MP_INVIS, MP_SUIT: haveItems := true;
+        MP_DMPOINT..MP_BLUEFLAG: haveAreas := true;
+        MP_COLLIDE..MP_NOACT:
           begin
-            if tiles[j].t = MP_WALL then
+            haveTriggers := true;
+            t := tiles[i].s;
+            if (t in [MP_CLOSEDOOR..MP_DOOR]) or (t >= 101) and (t <= 400) or (t >= 501) and (t <= 800) then
             begin
-              xx := tiles[j].x;
-              yy := tiles[j].y;
-              ww := textures[tiles[j].s].w;
-              hh := textures[tiles[j].s].h;
-              if isCollide(x, y, w, h, xx, yy, ww, hh) then
+              x := tiles[i].x0;
+              y := tiles[i].y0;
+              w := tiles[i].x1 - tiles[i].x0;
+              h := tiles[i].y1 - tiles[i].y0;
+              for j := 0 to High(tiles) do
               begin
-                tiles[j].door := tiles[j].t = MP_WALL;
-                if tiles[j].door and ((t = MP_DOOR) or ((t >= 101) and (t <= 400))) then
-                  tiles[j].switch := true;
+                if tiles[j].t = MP_WALL then
+                begin
+                  xx := tiles[j].x;
+                  yy := tiles[j].y;
+                  ww := textures[tiles[j].s].w;
+                  hh := textures[tiles[j].s].h;
+                  if isCollide(x, y, w, h, xx, yy, ww, hh) then
+                  begin
+                    tiles[j].door := tiles[j].t = MP_WALL;
+                    if tiles[j].door and ((t = MP_DOOR) or ((t >= 101) and (t <= 400))) then
+                      tiles[j].switch := true
+                  end
+                end
               end
             end
           end
-        end
-      end
+        else assert(false)
+      end;
     end;
     j := 0;
     for i := 0 to High(tiles) do
@@ -725,187 +736,196 @@ program mp2df;
     WriteBytes(f, [Ord('M'), Ord('A'), Ord('P'), 1]);
     WriteLn('header...');
     WriteHeader(f, name, '', desc, music, sky, width, height);
-    WriteLn('textures...');
-    BeginBlock(f, 1);
-    for i := 1 to High(textures) do
+    if High(textures) > 0 then
     begin
-      WriteTexture(f, ':' + textures[i].name, 0)
+      WriteLn('textures...');
+      BeginBlock(f, 1);
+      for i := 1 to High(textures) do
+        WriteTexture(f, ':' + textures[i].name, 0);
+      EndBlock(f);
     end;
-    EndBlock(f);
-    WriteLn('panels...');
-    BeginBlock(f, 2);
-    for i := 0 to High(tiles) do
+    if havePanels then
     begin
-      t := tiles[i];
-      if t.t in [MP_WALL..MP_LIFTRIGHT] then
+      WriteLn('panels...');
+      BeginBlock(f, 2);
+      for i := 0 to High(tiles) do
       begin
-        tiles[i].id := wrPanels;
-        if t.door then
-          WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, PANEL_CLOSEDOOR, 0, textures[t.s].flags)
-        else if t.t in [MP_LIFTUP..MP_LIFTRIGHT] then
-          WritePanel(f, t.x, t.y, 16, 16, 0, mp2df_wall[t.t], 0, PANEL_FLAG_HIDE)
-        else if t.t in [MP_WATER..MP_ACID2] then
-          WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, mp2df_wall[t.t], 0, textures[t.s].flags or PANEL_FLAG_WATERTEXTURES)
-        else
-          WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, mp2df_wall[t.t], 0, textures[t.s].flags)
-      end
+        t := tiles[i];
+        if t.t in [MP_WALL..MP_LIFTRIGHT] then
+        begin
+          tiles[i].id := wrPanels;
+          if t.door then
+            WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, PANEL_CLOSEDOOR, 0, textures[t.s].flags)
+          else if t.t in [MP_LIFTUP..MP_LIFTRIGHT] then
+            WritePanel(f, t.x, t.y, 16, 16, 0, mp2df_wall[t.t], 0, PANEL_FLAG_HIDE)
+          else if t.t in [MP_WATER..MP_ACID2] then
+            WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, mp2df_wall[t.t], 0, textures[t.s].flags or PANEL_FLAG_WATERTEXTURES)
+          else
+            WritePanel(f, t.x, t.y, textures[t.s].w, textures[t.s].h, textures[t.s].id, mp2df_wall[t.t], 0, textures[t.s].flags)
+        end
+      end;
+      EndBlock(f)
     end;
-    EndBlock(f);    
-    WriteLn('items...');
-    BeginBlock(f, 3);
-    for i := 0 to High(tiles) do
+    if haveItems then
     begin
-      t := tiles[i];
-      if t.t in [MP_MEDKIT_SMALL..MP_WEAPON_SUPERPULEMET, MP_INVIS, MP_SUIT] then
-        WriteItem(f, t.x, t.y, mp2df_item[t.t], 0)
-    end;
-    EndBlock(f);
-    WriteLn('areas...');
-    BeginBlock(f, 4);
-    for i := 0 to High(tiles) do
-    begin
-      t := tiles[i];
-      case t.t of
-        MP_DMPOINT..MP_BLUETEAMPOINT: WriteArea(f, t.x, t.y + 12, mp2df_area[t.t], 0);
-        MP_REDFLAG, MP_BLUEFLAG: WriteArea(f, t.x + 8, t.y - 4, mp2df_area[t.t], 1);
-      end
-    end;
-    EndBlock(f);
-    WriteLn('triggers...');
-    BeginBlock(f, 6);
-    for i := 0 to High(tiles) do
-    begin
-      t := tiles[i];
-      if t.t in [MP_COLLIDE..MP_NOACT] then
+      WriteLn('items...');
+      BeginBlock(f, 3);
+      for i := 0 to High(tiles) do
       begin
-        case t.s of
-          MP_EXIT:
-            begin
-              BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_EXIT, mp2df_act[t.t], 0);
-              ExitTrigger(f, '');
-              EndTrigger(f)
-            end;
-          MP_TELEPORT:
-            begin
-              BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_TELEPORT, mp2df_act[t.t], 0);
-              TeleportTrigger(f, t.x0, t.y0 + 32, true, false, 0);
-              EndTrigger(f)
-            end;
-          MP_CLOSEDOOR, MP_OPENDOOR:
-            begin
-              for j := 0 to High(tiles) do
+        t := tiles[i];
+        if t.t in [MP_MEDKIT_SMALL..MP_WEAPON_SUPERPULEMET, MP_INVIS, MP_SUIT] then
+          WriteItem(f, t.x, t.y, mp2df_item[t.t], 0)
+      end;
+      EndBlock(f)
+    end;
+    if haveAreas then
+    begin
+      WriteLn('areas...');
+      BeginBlock(f, 4);
+      for i := 0 to High(tiles) do
+      begin
+        t := tiles[i];
+        case t.t of
+          MP_DMPOINT..MP_BLUETEAMPOINT: WriteArea(f, t.x, t.y + 12, mp2df_area[t.t], 0);
+          MP_REDFLAG, MP_BLUEFLAG: WriteArea(f, t.x + 8, t.y - 4, mp2df_area[t.t], 1);
+        end
+      end;
+      EndBlock(f)
+    end;
+    if haveTriggers then
+    begin
+      WriteLn('triggers...');
+      BeginBlock(f, 6);
+      for i := 0 to High(tiles) do
+      begin
+        t := tiles[i];
+        if t.t in [MP_COLLIDE..MP_NOACT] then
+        begin
+          case t.s of
+            MP_EXIT:
               begin
-                if tiles[j].door and isCollide(t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, tiles[j].x, tiles[j].y, textures[tiles[j].s].w, textures[tiles[j].s].h) then
+                BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_EXIT, mp2df_act[t.t], 0);
+                ExitTrigger(f, '');
+                EndTrigger(f)
+              end;
+            MP_TELEPORT:
+              begin
+                BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_TELEPORT, mp2df_act[t.t], 0);
+                TeleportTrigger(f, t.x0, t.y0 + 32, true, false, 0);
+                EndTrigger(f)
+              end;
+            MP_CLOSEDOOR, MP_OPENDOOR:
+              begin
+                for j := 0 to High(tiles) do
                 begin
-                  if tiles[j].switch then
+                  if tiles[j].door and isCollide(t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, tiles[j].x, tiles[j].y, textures[tiles[j].s].w, textures[tiles[j].s].h) then
                   begin
-                    // sync with MP_DOOR
-                    BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_PRESS, mp2df_act[t.t], 0);
-                    SwitchTrigger(f, tiles[j].did * 32, IfThen(t.s = MP_CLOSEDOOR, -16, -32), 32, 16, 0, 1, 0, false);
-                    EndTrigger(f)
+                    if tiles[j].switch then
+                    begin
+                      // sync with MP_DOOR
+                      BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_PRESS, mp2df_act[t.t], 0);
+                      SwitchTrigger(f, tiles[j].did * 32, IfThen(t.s = MP_CLOSEDOOR, -16, -32), 32, 16, 0, 1, 0, false);
+                      EndTrigger(f)
+                    end
+                    else
+                    begin
+                      BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, mp2df_trig[t.s], mp2df_act[t.t], 0);
+                      DoorTrigger(f, tiles[j].id, false, false);
+                      EndTrigger(f)
+                    end
                   end
-                  else
-                  begin
-                    BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, mp2df_trig[t.s], mp2df_act[t.t], 0);
-                    DoorTrigger(f, tiles[j].id, false, false);
-                    EndTrigger(f);
-                  end
-                end
-              end
-            end;
-          MP_DOOR, 101..400:
-            begin
-              wait := IfThen(t.s = MP_DOOR, 0, t.s - 100);
-              // button: activate sequence in not locked
-              BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_PRESS, mp2df_act[t.t], 0);
-              SwitchTrigger(f, wrX, -80, 32, 16, 0, 1, 0, false);
-              EndTrigger(f);
-              // start: activate group + timer
-              BeginTrigger(f, wrX, -80, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
-              SwitchTrigger(f, wrX, -64, 32, 32, 0, 1, 0, false);
-              EndTrigger(f);
-              // start: lock start
-              BeginTrigger(f, wrX + 16, -80, 16, 16, 1, -1, TRIGGER_OFF, 0, 0);
-              SwitchTrigger(f, wrX, -80, 16, 16, 0, 1, 0, false);
-              EndTrigger(f);
-              for j := 0 to High(tiles) do
-              begin
-                if tiles[j].switch and isCollide(t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, tiles[j].x, tiles[j].y, textures[tiles[j].s].w, textures[tiles[j].s].h) then
-                begin                      
-                  // group: activate both branches
-                  BeginTrigger(f, wrX, -64, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
-                  SwitchTrigger(f, tiles[j].did * 32, -32, 32, 32, 0, 1, 0, false);
-                  EndTrigger(f);
                 end
               end;
-              // timer: wait & activate group
-              BeginTrigger(f, wrX, -48, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
-              SwitchTrigger(f, wrX, -64, 32, 16, SecToTick(wait), 1, 0, false);
-              EndTrigger(f);
-              // timer: wait & unlock start
-              BeginTrigger(f, wrX + 16, -48, 16, 16, 1, -1, TRIGGER_ON, 0, 0);
-              SwitchTrigger(f, wrX, -80, 16, 16, SecToTick(wait), 1, 0, false);
-              EndTrigger(f);
-              Inc(wrX, 32);
-            end;
-          MP_EXTENDER, MP_RANDOM, MP_SWITCH, 501..800:
-            begin
-              wait := IfThen(t.s in [MP_EXTENDER, MP_RANDOM, MP_SWITCH], 0, t.s - 500);
-              typ := IfThen(t.s in [MP_EXTENDER, MP_RANDOM, MP_SWITCH],  mp2df_trig[t.s], TRIGGER_PRESS);
-              BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, typ, mp2df_act[t.t], 0);
-              SwitchTrigger(f, t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, SecToTick(wait), 1, 0, t.s = MP_RANDOM);
-              EndTrigger(f)
-            end;
-          MP_DAMAGE:
-            begin
-              if (t.x = t.x0) and (t.y = t.y0) and (16 * t.sx = t.x1 - t.x0) and (16 * t.sy = t.y1 - t.y0) then
+            MP_DOOR, 101..400:
               begin
-                BeginTrigger(f, t.x, t.y, t.x1 - t.x0, t.y1 - t.y0, 1, -1, TRIGGER_DAMAGE, mp2df_act[t.t], 0);
-                DamageTrigger(f, 666, 0, 0);
-                EndTrigger(f)
-              end
-              else
-              begin
-                // TODO find non intersectable location for activation
+                wait := IfThen(t.s = MP_DOOR, 0, t.s - 100);
+                // button: activate sequence in not locked
                 BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_PRESS, mp2df_act[t.t], 0);
-                SwitchTrigger(f, t.x0, t.y0, 16, 16, 0, 1, 0, false);
+                SwitchTrigger(f, wrX, -80, 32, 16, 0, 1, 0, false);
                 EndTrigger(f);
-                BeginTrigger(f, t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, 1, -1, TRIGGER_DAMAGE, 0, 0);
-                DamageTrigger(f, 999, 0, 0);
+                // start: activate group + timer
+                BeginTrigger(f, wrX, -80, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
+                SwitchTrigger(f, wrX, -64, 32, 32, 0, 1, 0, false);
+                EndTrigger(f);
+                // start: lock start
+                BeginTrigger(f, wrX + 16, -80, 16, 16, 1, -1, TRIGGER_OFF, 0, 0);
+                SwitchTrigger(f, wrX, -80, 16, 16, 0, 1, 0, false);
                 EndTrigger(f);
                 for j := 0 to High(tiles) do
                 begin
-                  if (j <> i) and isCollide(t.x0, t.y0, 16, 16, tiles[j].x0, tiles[j].y0, tiles[j].x1 - tiles[j].x0, tiles[j].x1 - tiles[j].y0) then
+                  if tiles[j].switch and isCollide(t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, tiles[j].x, tiles[j].y, textures[tiles[j].s].w, textures[tiles[j].s].h) then
                   begin
-                    WriteLn('waring: trigger damage may activate triggers at ', t.x0, 'x', t.y0);
+                    // group: activate both branches
+                    BeginTrigger(f, wrX, -64, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
+                    SwitchTrigger(f, tiles[j].did * 32, -32, 32, 32, 0, 1, 0, false);
+                    EndTrigger(f)
                   end
+                end;
+                // timer: wait & activate group
+                BeginTrigger(f, wrX, -48, 16, 16, 1, -1, TRIGGER_PRESS, 0, 0);
+                SwitchTrigger(f, wrX, -64, 32, 16, SecToTick(wait), 1, 0, false);
+                EndTrigger(f);
+                // timer: wait & unlock start
+                BeginTrigger(f, wrX + 16, -48, 16, 16, 1, -1, TRIGGER_ON, 0, 0);
+                SwitchTrigger(f, wrX, -80, 16, 16, SecToTick(wait), 1, 0, false);
+                EndTrigger(f);
+                Inc(wrX, 32)
+              end;
+            MP_EXTENDER, MP_RANDOM, MP_SWITCH, 501..800:
+              begin
+                wait := IfThen(t.s in [MP_EXTENDER, MP_RANDOM, MP_SWITCH], 0, t.s - 500);
+                typ := IfThen(t.s in [MP_EXTENDER, MP_RANDOM, MP_SWITCH],  mp2df_trig[t.s], TRIGGER_PRESS);
+                BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, typ, mp2df_act[t.t], 0);
+                SwitchTrigger(f, t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, SecToTick(wait), 1, 0, t.s = MP_RANDOM);
+                EndTrigger(f)
+              end;
+            MP_DAMAGE:
+              begin
+                if (t.x = t.x0) and (t.y = t.y0) and (16 * t.sx = t.x1 - t.x0) and (16 * t.sy = t.y1 - t.y0) then
+                begin
+                  BeginTrigger(f, t.x, t.y, t.x1 - t.x0, t.y1 - t.y0, 1, -1, TRIGGER_DAMAGE, mp2df_act[t.t], 0);
+                  DamageTrigger(f, 666, 0, 0);
+                  EndTrigger(f)
+                end
+                else
+                begin
+                  // TODO find non intersectable location for activation
+                  BeginTrigger(f, t.x, t.y, Round(16 * t.sx), Round(16 * t.sy), 1, -1, TRIGGER_PRESS, mp2df_act[t.t], 0);
+                  SwitchTrigger(f, t.x0, t.y0, 16, 16, 0, 1, 0, false);
+                  EndTrigger(f);
+                  BeginTrigger(f, t.x0, t.y0, t.x1 - t.x0, t.y1 - t.y0, 1, -1, TRIGGER_DAMAGE, 0, 0);
+                  DamageTrigger(f, 999, 0, 0);
+                  EndTrigger(f);
+                  for j := 0 to High(tiles) do
+                    if (j <> i) and isCollide(t.x0, t.y0, 16, 16, tiles[j].x0, tiles[j].y0, tiles[j].x1 - tiles[j].x0, tiles[j].x1 - tiles[j].y0) then
+                      WriteLn('waring: trigger damage may activate triggers at ', t.x0, 'x', t.y0)
                 end
               end
-            end;
-          else WriteLn('warning: unknown MP trigger ', t.s)
+            else WriteLn('warning: unknown MP trigger ', t.s)
+          end
         end
-      end
-    end;
-    // MP_DOOR intermediate triggers
-    for i := 0 to High(tiles) do
-    begin
-      if tiles[i].switch then
+      end;
+      // MP_DOOR intermediate triggers
+      for i := 0 to High(tiles) do
       begin
-        // invert state
-        BeginTrigger(f, tiles[i].did * 32 + 16, -32, 16, 32, 1, -1, TRIGGER_ONOFF, 0, 0);
-        SwitchTrigger(f, tiles[i].did * 32, -32, 16, 32, 0, 1, 0, false);
-        EndTrigger(f);
-        // open trap
-        BeginTrigger(f, tiles[i].did * 32, -32, 16, 16, 1, -1, TRIGGER_OPENDOOR, 0, 0);
-        DoorTrigger(f, tiles[i].id, false, false);
-        EndTrigger(f);
-        // close trap
-        BeginTrigger(f, tiles[i].did * 32, -16, 16, 16, 0, -1, TRIGGER_CLOSETRAP, 0, 0);
-        DoorTrigger(f, tiles[i].id, false, false);
-        EndTrigger(f);
-      end
+        if tiles[i].switch then
+        begin
+          // invert state
+          BeginTrigger(f, tiles[i].did * 32 + 16, -32, 16, 32, 1, -1, TRIGGER_ONOFF, 0, 0);
+          SwitchTrigger(f, tiles[i].did * 32, -32, 16, 32, 0, 1, 0, false);
+          EndTrigger(f);
+          // open trap
+          BeginTrigger(f, tiles[i].did * 32, -32, 16, 16, 1, -1, TRIGGER_OPENDOOR, 0, 0);
+          DoorTrigger(f, tiles[i].id, false, false);
+          EndTrigger(f);
+          // close trap
+          BeginTrigger(f, tiles[i].did * 32, -16, 16, 16, 0, -1, TRIGGER_CLOSETRAP, 0, 0);
+          DoorTrigger(f, tiles[i].id, false, false);
+          EndTrigger(f)
+        end
+      end;
+      EndBlock(f)
     end;
-    EndBlock(f);
     WriteEnd(f);
     f.Free;
   end;
