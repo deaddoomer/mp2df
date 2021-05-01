@@ -356,10 +356,12 @@ program mp2df;
     end;
 
     procedure ReadFloat (var i: Single);
-      var s: AnsiString;
+      var s: AnsiString; fmt: TFormatSettings;
     begin
       ReadLn(f, s);
-      i := StrToFloat(s);
+      fmt := DefaultFormatSettings;
+      fmt.DecimalSeparator := '.';
+      i := StrToFloat(s, fmt);
     end;
 
   begin
